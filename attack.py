@@ -17,20 +17,20 @@ UPPER_HEIGHT = 10
 BYTES_PER_ROW = 16
 ROW_LENGTH = 12 + 3 * BYTES_PER_ROW
 
-BASE_ADDR = 0x80000000
+BASE_ADDR = 0xd0000000
 PAGE_SIZE = 0x1000
 
 def range_length(base, len):
   return range(base, base + len)
 
-KEY1 = range_length(0x80000aa8, 16)
-KEY2 = range_length(0x80001aa8, 16)
+KEY1 = range_length(0xd00004c8, 16)
+KEY2 = range_length(0xd0001598, 16)
 
-SALT1 = range_length(0x80000b6c, 8)
-SALT2 = range_length(0x80001b6c, 8)
+SALT1 = range_length(0xd000058c, 8)
+SALT2 = range_length(0xd000165c, 8)
 
-NONCE1 = range_length(0x80000b79, 8)
-NONCE2 = range_length(0x80001b78, 8)
+NONCE1 = range_length(0xd0000599, 8)
+NONCE2 = range_length(0xd0001668, 8)
 
 simulate = len(sys.argv) > 1
 working = False
