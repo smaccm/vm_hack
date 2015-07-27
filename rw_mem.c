@@ -36,16 +36,15 @@ void usage(int argc, char **argv)
 void do_read(void *vaddr, off_t size, off_t address) {
   VPRINT("do read: vaddr: %p, size: %u\n", vaddr, size);
   int bytes_read = 0;
-  int count = 0;
   while (bytes_read < size) {
-    if (count % 16 == 0) {
+    if (bytes_read % 16 == 0) {
       printf("0x%08x: ", address + bytes_read);
     }
     printf("0x%02x ", ((char*)vaddr)[bytes_read]);
-    if (++count % 16 == 0) {
+    bytes_read++;
+    if (bytes_read % 16 == 0) {
       printf("\n");
     }
-    bytes_read++;
   }
   printf("\n");
 }
