@@ -42,7 +42,7 @@ void do_read(void *vaddr, off_t size, off_t address) {
     }
     printf("0x%02x ", ((char*)vaddr)[bytes_read]);
     bytes_read++;
-    if (bytes_read % 16 == 0) {
+    if (bytes_read % 16 == 0 && bytes_read < size) {
       printf("\n");
     }
   }
