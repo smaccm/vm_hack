@@ -31,6 +31,8 @@ NONCE2 = range_length(0x80001b78, 8)
 
 simulate = len(sys.argv) > 1
 working = False
+if simulate:
+  working = sys.argv[1].lower() in ["true", "1", "yes", "t", "y"]
 
 DEV_NULL = open(os.devnull, 'w')
 
@@ -57,7 +59,10 @@ if not simulate:
       working = True
 else:
   for addr in range(0, 2 * PAGE_SIZE):
-    mem[addr] = chr(random.randint(0, 255))
+    if working:
+      mem[addr] = chr(random.randint(0, 255))
+    else:
+      mem[addr] = chr(0)
 
 def main(stdscr):
   my, mx = stdscr.getmaxyx()
@@ -110,14 +115,18 @@ def main(stdscr):
     
     def highlight_and_modify(block, text, modify):
       if block[0] in middle_addrs:
-        if not working:
-          return
 
         py, px = lower.getyx()
-        upper.addstr("Found " + text + ": ")
+        if working:
+          upper.addstr("Found " + text + ": ")
+        else:
+          upper.addstr(text.capitalize() + " missing!")
         upper.refresh()
 
-        lower.addstr(middle, 12 + 3 * BYTES_PER_ROW + 2, text, curses.A_BOLD)
+        if working:
+          lower.addstr(middle, 12 + 3 * BYTES_PER_ROW + 2, text, curses.A_BOLD)
+        else:
+          lower.addstr(middle, 12 + 3 * BYTES_PER_ROW + 2, text + " missing", curses.A_BOLD)
         
         # Highlight block
         for block_addr in block:
@@ -128,8 +137,9 @@ def main(stdscr):
             hy += 1
           hx = 12 + 3 * offset
 
-          upper.addstr("%02x " % ord(mem[block_addr - BASE_ADDR]))
-          upper.refresh()
+          if working:
+            upper.addstr("%02x " % ord(mem[block_addr - BASE_ADDR]))
+            upper.refresh()
           length = 3
           if (offset == BYTES_PER_ROW - 1 or block_addr == block[-1]):
             length = 2
@@ -142,7 +152,7 @@ def main(stdscr):
         stdscr.getch()
 
         # Modify block
-        if modify:
+        if modify and working:
           upper.addstr("Modifying\n", curses.A_BOLD)
           upper.refresh()
 
