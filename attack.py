@@ -9,7 +9,7 @@ from time import sleep
 from mmap import mmap
 from subprocess import call
 
-WIDTH = 120
+WIDTH = 112
 UPPER_HEIGHT = 10
 LOWER_HEIGHT = 35
 BYTES_PER_ROW = 16
@@ -55,6 +55,9 @@ else:
     mem[addr] = chr(random.randint(0, 255))
 
 def main(stdscr):
+  my, mx = stdscr.getmaxyx()
+  LOWER_HEIGHT = max(7, my - UPPER_HEIGHT)
+
   curses.curs_set(False)
   curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_GREEN)
   GREEN = curses.color_pair(1)
@@ -91,7 +94,7 @@ def main(stdscr):
 
     for col in range(0, BYTES_PER_ROW):
       addr = row_addr + col;
-      lower.addstr("0x%02x " % ord(mem[addr - BASE_ADDR]))
+      lower.addstr("%02x " % ord(mem[addr - BASE_ADDR]))
 
     lower.refresh()
     sleep(0.015)
@@ -103,10 +106,10 @@ def main(stdscr):
     def highlight_and_modify(block, text, modify):
       if block[0] in middle_addrs:
         py, px = lower.getyx()
-        upper.addstr("Found encryption " + text + ": ")
+        upper.addstr("Found " + text + ": ")
         upper.refresh()
 
-        lower.addstr(middle, 12 + 5 * BYTES_PER_ROW + 2, text + " detected", curses.A_BOLD)
+        lower.addstr(middle, 12 + 3 * BYTES_PER_ROW + 2, text, curses.A_BOLD)
         
         # Highlight block
         for block_addr in block:
@@ -115,13 +118,13 @@ def main(stdscr):
           while (offset >= BYTES_PER_ROW):
             offset -= BYTES_PER_ROW
             hy += 1
-          hx = 12 + 5 * offset
+          hx = 12 + 3 * offset
 
-          upper.addstr("0x%02x " % ord(mem[block_addr - BASE_ADDR]))
+          upper.addstr("%02x " % ord(mem[block_addr - BASE_ADDR]))
           upper.refresh()
-          length = 5
+          length = 3
           if (offset == BYTES_PER_ROW - 1 or block_addr == block[-1]):
-            length = 4
+            length = 2
           lower.chgat(hy, hx, length, GREEN)
           lower.refresh()
           sleep(0.05)
@@ -141,31 +144,31 @@ def main(stdscr):
             while (offset >= BYTES_PER_ROW):
               offset -= BYTES_PER_ROW
               hy += 1
-            hx = 12 + 5 * offset
-            mod_text = "0x00 "
+            hx = 12 + 3 * offset
+            mod_text = "00 "
             if (offset == BYTES_PER_ROW - 1 or block_addr == block[-1]):
-              mod_text = "0x00"
+              mod_text = "00"
 
             lower.addstr(hy, hx, mod_text, RED)
             lower.refresh()
             sleep(0.25)
 
-          lower.addstr(middle, 12 + 5 * BYTES_PER_ROW + 2, text + " modified", curses.A_BOLD)
+          lower.addstr(middle, 12 + 3 * BYTES_PER_ROW + 2, text + " (modified)", curses.A_BOLD)
           lower.refresh()
           if not simulate:
             # Python can't seem to modify /dev/mem through the mmap, so use rw_mem
-            call_n(["./rw_mem", "-a", "0x%08x" % block[0], "-s", str(len(block)), "-w", "-h", "0x00"], 10)
+            call_n(["./rw_mem", "-a", "0x%08x" % block[0], "-s", str(len(block)), "-w", "-h", "0x00"], 100)
             flush()
           stdscr.getch()
 
         lower.move(py, px)
 
-    highlight_and_modify(KEY1, "key", False)
-    highlight_and_modify(KEY2, "key", False)
-    highlight_and_modify(SALT1, "salt", True)
-    highlight_and_modify(SALT2, "salt", True)
-    highlight_and_modify(NONCE1, "nonce", True)
-    highlight_and_modify(NONCE2, "nonce", True)
+    highlight_and_modify(KEY1, "decryption key", False)
+    highlight_and_modify(KEY2, "encryption key", False)
+    highlight_and_modify(SALT1, "decryption salt", True)
+    highlight_and_modify(SALT2, "encryption salt", True)
+    highlight_and_modify(NONCE1, "decryption nonce", True)
+    highlight_and_modify(NONCE2, "encryption nonce", True)
 
     lower.addstr("\n")
 
