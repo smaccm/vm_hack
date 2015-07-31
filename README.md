@@ -33,9 +33,9 @@ Running the demo
 1. Run the Odroid and the legitimate GCS as normal. Demonstrate that
 the legitimate GCS has control of the Odroid.
 
-2. In the VM, go into the repository for this demo and execute `make
-clean hack`. You may want to run it a few times to be sure (sometimes
-there are caching issues).
+2. In the VM, go into the repository for this demo and execute
+`./attack.sh`. If that doesn't work (due to caching issues) you can
+just run `make clean hack` to do a quick version of the attack.
 
 3. Demonstrate that the legitimate GCS has lost control of the Odroid.
 
