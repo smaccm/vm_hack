@@ -41,6 +41,10 @@ def flush():
     call(["make", "clean"], stdout=DEV_NULL)
     call(["make"], stdout=DEV_NULL)
 
+def call_n(args, n):
+  for i in range(0, n):
+    call(args)
+
 mem = {}
 if not simulate:
   flush()
@@ -150,7 +154,7 @@ def main(stdscr):
           lower.refresh()
           if not simulate:
             # Python can't seem to modify /dev/mem through the mmap, so use rw_mem
-            call(["./rw_mem", "-a", "0x%08x" % block[0], "-s", str(len(block)), "-w", "-h", "0x00"])
+            call_n(["./rw_mem", "-a", "0x%08x" % block[0], "-s", str(len(block)), "-w", "-h", "0x00"], 10)
             flush()
           stdscr.getch()
 
