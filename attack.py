@@ -1,12 +1,20 @@
-from time import sleep
+#!/usr/bin/env python
+
 import sys
 import curses
 import re
+import os
+from time import sleep
+from mmap import mmap
+from subprocess import call
 
 WIDTH = 120
 UPPER_HEIGHT = 10
 LOWER_HEIGHT = 35
 BYTES_PER_ROW = 16
+
+BASE_ADDR = 0x80000000
+PAGE_SIZE = 0x1000
 
 def range_length(base, len):
   return range(base, base + len)
@@ -20,15 +28,16 @@ SALT2 = range_length(0x80001b6c, 8)
 NONCE1 = range_length(0x80000b79, 8)
 NONCE2 = range_length(0x80001b78, 8)
 
-data = {}
+DEV_NULL = open(os.devnull, 'w')
 
-def parse():
-  with open("data") as f:
-    for line in f.readlines():
-      base, rest = line.split(':')
-      base = int(base, 16)
-      for idx, val in enumerate(rest.split()):
-        data[base + idx] = int(val, 16)
+def flush():
+    # Recompiling seems to be enough to flush out the cache
+    call(["make", "clean"], stdout=DEV_NULL)
+    call(["make"], stdout=DEV_NULL)
+
+flush()
+dev_mem_fd = os.open('/dev/mem', os.O_RDWR | os.O_SYNC)
+mem = mmap(dev_mem_fd, 2 * PAGE_SIZE, offset=BASE_ADDR)
 
 def main(stdscr):
   curses.curs_set(False)
@@ -61,17 +70,16 @@ def main(stdscr):
   upper.addstr("Searching...\n")
   upper.refresh()
 
-  base_addr = min(data)
-  for row in range(0, len(data) / BYTES_PER_ROW):
-    row_addr = base_addr + BYTES_PER_ROW * row
+  for row in range(0, 2 * PAGE_SIZE / BYTES_PER_ROW):
+    row_addr = BASE_ADDR + BYTES_PER_ROW * row
     lower.addstr("0x%08x: " % row_addr)
 
     for col in range(0, BYTES_PER_ROW):
       addr = row_addr + col;
-      lower.addstr("0x%02x " % data[addr])
-      lower.refresh()
+      lower.addstr("0x%02x " % ord(mem[addr - BASE_ADDR]))
 
-    sleep(0.02)
+    lower.refresh()
+    #sleep(0.02)
 
     middle = (LOWER_HEIGHT - 3) / 2
     middle_addr = row_addr - (LOWER_HEIGHT - 3 - middle) * BYTES_PER_ROW
@@ -94,7 +102,7 @@ def main(stdscr):
             hy += 1
           hx = 12 + 5 * offset
 
-          upper.addstr("0x%02x " % data[block_addr])
+          upper.addstr("0x%02x " % ord(mem[block_addr - BASE_ADDR]))
           upper.refresh()
           length = 5
           if (offset == BYTES_PER_ROW - 1 or block_addr == block[-1]):
@@ -129,6 +137,12 @@ def main(stdscr):
 
           lower.addstr(middle, 12 + 5 * BYTES_PER_ROW + 2, text + " modified", curses.A_BOLD)
           lower.refresh()
+          # Python can't seem to modify /dev/mem through the mmap, so use rw_mem
+          args = ["./rw_mem", "-a", "0x%08x" % block[0], "-s", str(len(block)), "-w", "-h", "0x00"]
+          upper.addstr(str(args))
+          upper.refresh()
+          call(args)
+          flush()
           stdscr.getch()
 
         lower.move(py, px)
@@ -144,8 +158,8 @@ def main(stdscr):
 
   upper.addstr("Finished (press q to quit)")
   upper.refresh()
+  flush()
   while (stdscr.getch() != ord('q')):
     pass
 
-parse()
 curses.wrapper(main)
