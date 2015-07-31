@@ -4,6 +4,7 @@ import sys
 import curses
 import re
 import os
+import random
 from time import sleep
 from mmap import mmap
 from subprocess import call
@@ -28,16 +29,26 @@ SALT2 = range_length(0x80001b6c, 8)
 NONCE1 = range_length(0x80000b79, 8)
 NONCE2 = range_length(0x80001b78, 8)
 
+simulate = len(sys.argv) > 1
+
 DEV_NULL = open(os.devnull, 'w')
 
 def flush():
-    # Recompiling seems to be enough to flush out the VM cache
+  if not simulate:
+    # Recompiling a couple times seems to be enough to flush out the VM cache
+    call(["make", "clean"], stdout=DEV_NULL)
+    call(["make"], stdout=DEV_NULL)
     call(["make", "clean"], stdout=DEV_NULL)
     call(["make"], stdout=DEV_NULL)
 
-flush()
-dev_mem_fd = os.open('/dev/mem', os.O_RDWR | os.O_SYNC)
-mem = mmap(dev_mem_fd, 2 * PAGE_SIZE, offset=BASE_ADDR)
+mem = {}
+if not simulate:
+  flush()
+  dev_mem_fd = os.open('/dev/mem', os.O_RDWR | os.O_SYNC)
+  mem = mmap(dev_mem_fd, 2 * PAGE_SIZE, offset=BASE_ADDR)
+else:
+  for addr in range(0, 2 * PAGE_SIZE):
+    mem[addr] = chr(random.randint(0, 255))
 
 def main(stdscr):
   curses.curs_set(False)
@@ -79,7 +90,7 @@ def main(stdscr):
       lower.addstr("0x%02x " % ord(mem[addr - BASE_ADDR]))
 
     lower.refresh()
-    sleep(0.02)
+    sleep(0.015)
 
     middle = (LOWER_HEIGHT - 3) / 2
     middle_addr = row_addr - (LOWER_HEIGHT - 3 - middle) * BYTES_PER_ROW
@@ -109,7 +120,7 @@ def main(stdscr):
             length = 4
           lower.chgat(hy, hx, length, GREEN)
           lower.refresh()
-          sleep(0.1)
+          sleep(0.05)
 
         upper.addstr("\n")
         upper.refresh()
@@ -137,9 +148,10 @@ def main(stdscr):
 
           lower.addstr(middle, 12 + 5 * BYTES_PER_ROW + 2, text + " modified", curses.A_BOLD)
           lower.refresh()
-          # Python can't seem to modify /dev/mem through the mmap, so use rw_mem
-          call(["./rw_mem", "-a", "0x%08x" % block[0], "-s", str(len(block)), "-w", "-h", "0x00"])
-          flush()
+          if not simulate:
+            # Python can't seem to modify /dev/mem through the mmap, so use rw_mem
+            call(["./rw_mem", "-a", "0x%08x" % block[0], "-s", str(len(block)), "-w", "-h", "0x00"])
+            flush()
           stdscr.getch()
 
         lower.move(py, px)
@@ -155,7 +167,6 @@ def main(stdscr):
 
   upper.addstr("Finished (press q to quit)")
   upper.refresh()
-  flush()
   while (stdscr.getch() != ord('q')):
     pass
 
