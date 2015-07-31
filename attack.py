@@ -114,19 +114,15 @@ def main(stdscr):
     middle_addrs = range_length(middle_addr, BYTES_PER_ROW)
     
     def highlight_and_modify(block, text, modify):
-      if block[0] in middle_addrs:
+      if not working:
+        return
 
+      if block[0] in middle_addrs:
         py, px = lower.getyx()
-        if working:
-          upper.addstr("Found " + text + ": ")
-        else:
-          upper.addstr(text.capitalize() + " missing!")
+        upper.addstr("Found " + text + ": ")
         upper.refresh()
 
-        if working:
-          lower.addstr(middle, 12 + 3 * BYTES_PER_ROW + 2, text, curses.A_BOLD)
-        else:
-          lower.addstr(middle, 12 + 3 * BYTES_PER_ROW + 2, text + " missing", curses.A_BOLD)
+        lower.addstr(middle, 12 + 3 * BYTES_PER_ROW + 2, text, curses.A_BOLD)
         
         # Highlight block
         for block_addr in block:
@@ -137,9 +133,8 @@ def main(stdscr):
             hy += 1
           hx = 12 + 3 * offset
 
-          if working:
-            upper.addstr("%02x " % ord(mem[block_addr - BASE_ADDR]))
-            upper.refresh()
+          upper.addstr("%02x " % ord(mem[block_addr - BASE_ADDR]))
+          upper.refresh()
           length = 3
           if (offset == BYTES_PER_ROW - 1 or block_addr == block[-1]):
             length = 2
@@ -152,7 +147,7 @@ def main(stdscr):
         stdscr.getch()
 
         # Modify block
-        if modify and working:
+        if modify:
           upper.addstr("Modifying\n", curses.A_BOLD)
           upper.refresh()
 
