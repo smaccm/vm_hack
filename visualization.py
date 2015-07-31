@@ -5,7 +5,7 @@ import re
 
 WIDTH = 120
 UPPER_HEIGHT = 10
-LOWER_HEIGHT = 40
+LOWER_HEIGHT = 35
 BYTES_PER_ROW = 16
 
 def range_length(base, len):
@@ -66,17 +66,15 @@ def main(stdscr):
     row_addr = base_addr + BYTES_PER_ROW * row
     lower.addstr("0x%08x: " % row_addr)
 
-    pause = False
     for col in range(0, BYTES_PER_ROW):
       addr = row_addr + col;
-      val = data[addr]
-      lower.addstr("0x%02x " % val)
+      lower.addstr("0x%02x " % data[addr])
       lower.refresh()
 
     sleep(0.02)
 
-    middle = (LOWER_HEIGHT - 2) / 2
-    middle_addr = row_addr - (middle - 1) * BYTES_PER_ROW
+    middle = (LOWER_HEIGHT - 3) / 2
+    middle_addr = row_addr - (LOWER_HEIGHT - 3 - middle) * BYTES_PER_ROW
     middle_addrs = range_length(middle_addr, BYTES_PER_ROW)
     
     def highlight_and_modify(block, text, modify):
