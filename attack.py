@@ -49,7 +49,9 @@ mem = {}
 if not simulate:
   flush()
   dev_mem_fd = os.open('/dev/mem', os.O_RDWR | os.O_SYNC)
-  mem = mmap(dev_mem_fd, 2 * PAGE_SIZE, offset=BASE_ADDR)
+  dev_mem = mmap(dev_mem_fd, 2 * PAGE_SIZE, offset=BASE_ADDR)
+  for addr in range(0, 2 * PAGE_SIZE):
+    mem[addr] = dev_mem[addr]
 else:
   for addr in range(0, 2 * PAGE_SIZE):
     mem[addr] = chr(random.randint(0, 255))
