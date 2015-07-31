@@ -30,6 +30,7 @@ NONCE1 = range_length(0x80000b79, 8)
 NONCE2 = range_length(0x80001b78, 8)
 
 simulate = len(sys.argv) > 1
+working = False
 
 DEV_NULL = open(os.devnull, 'w')
 
@@ -52,6 +53,8 @@ if not simulate:
   dev_mem = mmap(dev_mem_fd, 2 * PAGE_SIZE, offset=BASE_ADDR)
   for addr in range(0, 2 * PAGE_SIZE):
     mem[addr] = dev_mem[addr]
+    if mem[addr] != chr(0):
+      working = True
 else:
   for addr in range(0, 2 * PAGE_SIZE):
     mem[addr] = chr(random.randint(0, 255))
@@ -107,6 +110,9 @@ def main(stdscr):
     
     def highlight_and_modify(block, text, modify):
       if block[0] in middle_addrs:
+        if not working:
+          return
+
         py, px = lower.getyx()
         upper.addstr("Found " + text + ": ")
         upper.refresh()
@@ -173,6 +179,10 @@ def main(stdscr):
     highlight_and_modify(NONCE2, "encryption nonce", True)
 
     lower.addstr("\n")
+
+  if not working:
+    upper.addstr("Attacked fail!\n", curses.A_BOLD)
+    upper.refresh()
 
   upper.addstr("Finished (press q to quit)")
   upper.refresh()
