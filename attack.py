@@ -31,7 +31,7 @@ NONCE2 = range_length(0x80001b78, 8)
 DEV_NULL = open(os.devnull, 'w')
 
 def flush():
-    # Recompiling seems to be enough to flush out the cache
+    # Recompiling seems to be enough to flush out the VM cache
     call(["make", "clean"], stdout=DEV_NULL)
     call(["make"], stdout=DEV_NULL)
 
@@ -79,7 +79,7 @@ def main(stdscr):
       lower.addstr("0x%02x " % ord(mem[addr - BASE_ADDR]))
 
     lower.refresh()
-    #sleep(0.02)
+    sleep(0.02)
 
     middle = (LOWER_HEIGHT - 3) / 2
     middle_addr = row_addr - (LOWER_HEIGHT - 3 - middle) * BYTES_PER_ROW
@@ -138,10 +138,7 @@ def main(stdscr):
           lower.addstr(middle, 12 + 5 * BYTES_PER_ROW + 2, text + " modified", curses.A_BOLD)
           lower.refresh()
           # Python can't seem to modify /dev/mem through the mmap, so use rw_mem
-          args = ["./rw_mem", "-a", "0x%08x" % block[0], "-s", str(len(block)), "-w", "-h", "0x00"]
-          upper.addstr(str(args))
-          upper.refresh()
-          call(args)
+          call(["./rw_mem", "-a", "0x%08x" % block[0], "-s", str(len(block)), "-w", "-h", "0x00"])
           flush()
           stdscr.getch()
 
