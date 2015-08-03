@@ -20,6 +20,7 @@
 			   __LINE__, __FILE__, errno, strerror(errno)); exit(1); } while(0)
 
 int verbose = 0;
+int do_flush = 0;
 
 void usage(int argc, char **argv)
 {
@@ -31,11 +32,35 @@ void usage(int argc, char **argv)
   printf("\t-s size: number of byte to read or write\n");
   printf("\t-c char: character to write to memory (as in memset)\n");
   printf("\t-h hex: byte value to write to memory (as in memset)\n");
+  printf("\t-F flush: flush cache before reading/writing\n");
+}
+
+#define CACHE_SIZE 0x100000
+#define FLUSH_BUF_SIZE (CACHE_SIZE * 8)
+
+void flush_cache(void *beg, size_t size) {
+  static char *buf1 = NULL;
+  static char *buf2 = NULL;
+  if (!do_flush) {
+    return;
+  }
+  __clear_cache(beg, ((char*)beg) + size);
+  if (buf1 == NULL) {
+      buf1 = malloc(FLUSH_BUF_SIZE);
+      if (buf1 == NULL) FATAL;
+  }
+  if (buf2 == NULL) {
+      buf2 = malloc(FLUSH_BUF_SIZE);
+      if (buf2 == NULL) FATAL;
+  }
+  memcpy(buf1, buf2, FLUSH_BUF_SIZE);
+  VPRINT("flushed cache: %p - %p\n", beg, ((char*)beg) + size);
 }
 
 void do_read(void *vaddr, off_t size, off_t address) {
   VPRINT("do read: vaddr: %p, size: %u\n", vaddr, size);
   int bytes_read = 0;
+  flush_cache(vaddr, size);
   while (bytes_read < size) {
     if (bytes_read % 16 == 0) {
       printf("0x%08x: ", address + bytes_read);
@@ -51,6 +76,7 @@ void do_read(void *vaddr, off_t size, off_t address) {
 
 void do_write(void *vaddr, off_t size, char value, int file_fd) {
   VPRINT("do write: vaddr: %p, size: %u, value: %x, file_fd: %d\n", vaddr, size, value, file_fd);
+  flush_cache(vaddr, size);
   if (file_fd >= 0) {
     if (read(file_fd, vaddr, size) < size) FATAL;
     close(file_fd);
@@ -59,6 +85,7 @@ void do_write(void *vaddr, off_t size, char value, int file_fd) {
     memset(vaddr, value, size);
     VPRINT("memset %u bytes of %c to %p\n", size, value, vaddr);
   }
+  flush_cache(vaddr, size);
 }
 
 int main(int argc, char **argv)
@@ -103,6 +130,9 @@ int main(int argc, char **argv)
     case 'h':
       value = (char)strtoul(optarg, 0, 0);
       break;
+    case 'F':
+	do_flush = 1;
+	break;
     case '?':
     default:
       //printf("got unknown arg: %c (%d, %x)\n", ch, ch, ch);
