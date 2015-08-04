@@ -46,12 +46,12 @@ void flush_cache(void *beg, size_t size) {
   }
   __clear_cache(beg, ((char*)beg) + size);
   if (buf1 == NULL) {
-      buf1 = malloc(FLUSH_BUF_SIZE);
-      if (buf1 == NULL) FATAL;
+    buf1 = (char*) malloc(FLUSH_BUF_SIZE);
+    if (buf1 == NULL) FATAL;
   }
   if (buf2 == NULL) {
-      buf2 = malloc(FLUSH_BUF_SIZE);
-      if (buf2 == NULL) FATAL;
+    buf2 = (char*) malloc(FLUSH_BUF_SIZE);
+    if (buf2 == NULL) FATAL;
   }
   memcpy(buf1, buf2, FLUSH_BUF_SIZE);
   VPRINT("flushed cache: %p - %p\n", beg, ((char*)beg) + size);
@@ -104,7 +104,7 @@ int main(int argc, char **argv)
     exit(0);
   }
   int done = 0;
-  while ((ch = getopt(argc, argv, "rwva:f:s:c:h:")) != -1) {
+  while ((ch = getopt(argc, argv, "rwvFa:f:s:c:h:")) != -1) {
     switch (ch) {
     case 'r':
       mode = MODE_READ;

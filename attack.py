@@ -170,7 +170,7 @@ def main(stdscr):
           lower.refresh()
           if not simulate:
             # Python can't seem to modify /dev/mem through the mmap, so use rw_mem
-            call_n(["./rw_mem", "-a", "0x%08x" % block[0], "-s", str(len(block)), "-w", "-h", "0x00", "-F"], 100)
+            call_n(["./rw_mem", "-a", "0x%08x" % block[0], "-s", str(len(block)), "-w", "-h", "0x00", "-F"], 10)
             flush()
           stdscr.getch()
 
