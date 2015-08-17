@@ -9,9 +9,8 @@ from time import sleep
 from mmap import mmap
 from subprocess import call
 
-WIDTH = 112
+MIN_WIDTH = 95
 UPPER_HEIGHT = 10
-LOWER_HEIGHT = 35
 BYTES_PER_ROW = 16
 
 BASE_ADDR = 0x80000000
@@ -55,7 +54,8 @@ else:
 
 def main(stdscr):
   my, mx = stdscr.getmaxyx()
-  LOWER_HEIGHT = max(7, my - UPPER_HEIGHT)
+  lower_height = max(7, my - UPPER_HEIGHT)
+  width = max(MIN_WIDTH, mx)
 
   curses.curs_set(False)
   curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_GREEN)
@@ -63,16 +63,16 @@ def main(stdscr):
   curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_RED)
   RED = curses.color_pair(2)
 
-  upper_box = curses.newwin(UPPER_HEIGHT, WIDTH, 0, 0)
+  upper_box = curses.newwin(UPPER_HEIGHT, width, 0, 0)
   upper_box.border(0)
   upper_box.addstr(0, 1, "Status")
-  upper = curses.newwin(UPPER_HEIGHT - 2, WIDTH - 2, 1, 1)
+  upper = curses.newwin(UPPER_HEIGHT - 2, width - 2, 1, 1)
   upper.scrollok(True)
 
-  lower_box = curses.newwin(LOWER_HEIGHT, WIDTH, UPPER_HEIGHT, 0)
+  lower_box = curses.newwin(lower_height, width, UPPER_HEIGHT, 0)
   lower_box.border(0)
   lower_box.addstr(0, 1, "Memory")
-  lower = curses.newwin(LOWER_HEIGHT - 2, WIDTH - 2, UPPER_HEIGHT + 1, 1)
+  lower = curses.newwin(lower_height - 2, width - 2, UPPER_HEIGHT + 1, 1)
   lower.scrollok(True)
 
   stdscr.refresh()
@@ -98,8 +98,8 @@ def main(stdscr):
     lower.refresh()
     sleep(0.015)
 
-    middle = (LOWER_HEIGHT - 3) / 2
-    middle_addr = row_addr - (LOWER_HEIGHT - 3 - middle) * BYTES_PER_ROW
+    middle = (lower_height - 3) / 2
+    middle_addr = row_addr - (lower_height - 3 - middle) * BYTES_PER_ROW
     middle_addrs = range_length(middle_addr, BYTES_PER_ROW)
     
     def highlight_and_modify(block, text, modify):
