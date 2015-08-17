@@ -34,23 +34,12 @@ working = False
 if simulate:
   working = sys.argv[1].lower() in ["true", "1", "yes", "t", "y"]
 
-DEV_NULL = open(os.devnull, 'w')
-
-def flush():
-  if not simulate:
-    # Recompiling a couple times seems to be enough to flush out the VM cache
-    call(["make", "clean"], stdout=DEV_NULL)
-    call(["make"], stdout=DEV_NULL)
-    call(["make", "clean"], stdout=DEV_NULL)
-    call(["make"], stdout=DEV_NULL)
-
-def call_n(args, n):
-  for i in range(0, n):
-    call(args)
+if not simulate:
+  DEV_NULL = open(os.devnull, 'w')
+  call(["make", "rw_mem"], stdout=DEV_NULL)
 
 mem = {}
 if not simulate:
-  flush()
   dev_mem_fd = os.open('/dev/mem', os.O_RDWR | os.O_SYNC)
   dev_mem = mmap(dev_mem_fd, 2 * PAGE_SIZE, offset=BASE_ADDR)
   for addr in range(0, 2 * PAGE_SIZE):
@@ -170,8 +159,7 @@ def main(stdscr):
           lower.refresh()
           if not simulate:
             # Python can't seem to modify /dev/mem through the mmap, so use rw_mem
-            call_n(["./rw_mem", "-a", "0x%08x" % block[0], "-s", str(len(block)), "-w", "-h", "0x00", "-F"], 30)
-            flush()
+            call(["./rw_mem", "-a", "0x%08x" % block[0], "-s", str(len(block)), "-w", "-h", "0x00"])
           stdscr.getch()
 
         lower.move(py, px)

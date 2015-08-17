@@ -81,8 +81,19 @@ pt_commsecDecodeState_inst_group_bin_1 {
 }
 ```
 
-We need to insert this frame into the cnode for the vm. We need to
-leave one empty cnode and then place it in the next available slot:
+First we need to mark this page as uncached since the Linux VM treats
+it as uncached. We do this by adding the `uncached` attribute:
+
+```
+pt_commsecDecodeState_inst_group_bin_1 {
+...
+0x30: frame_commsecDecodeState_inst_group_bin_192 (RWX, uncached)
+...
+}
+```
+
+Then, we need to insert this frame into the cnode for the vm. We need
+to leave one empty cnode and then place it in the next available slot:
 
 ```
 cnode_vm {
@@ -122,6 +133,16 @@ We see that we want offset `0x2f` in `pt_commsecEncodeState_inst_group_bin_1` wh
 pt_commsecEncodeState_inst_group_bin_1 {
 ...
 0x2f: frame_commsecEncodeState_inst_group_bin_217 (RWX)
+...
+}
+```
+
+First we mark this as `uncached`:
+
+```
+pt_commsecEncodeState_inst_group_bin_1 {
+...
+0x2f: frame_commsecEncodeState_inst_group_bin_217 (RWX, uncached)
 ...
 }
 ```
