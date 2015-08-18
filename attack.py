@@ -33,16 +33,11 @@ working = False
 if simulate:
   working = sys.argv[1].lower() in ["true", "1", "yes", "t", "y"]
 
-if not simulate:
-  DEV_NULL = open(os.devnull, 'w')
-  call(["make", "rw_mem"], stdout=DEV_NULL)
-
 mem = {}
 if not simulate:
   dev_mem_fd = os.open('/dev/mem', os.O_RDWR | os.O_SYNC)
-  dev_mem = mmap(dev_mem_fd, 2 * PAGE_SIZE, offset=BASE_ADDR)
+  mem = mmap(dev_mem_fd, 2 * PAGE_SIZE, offset=BASE_ADDR)
   for addr in range(0, 2 * PAGE_SIZE):
-    mem[addr] = dev_mem[addr]
     if mem[addr] != chr(0):
       working = True
 else:
@@ -86,6 +81,7 @@ def main(stdscr):
   stdscr.getch()
   upper.addstr("Searching...\n")
   upper.refresh()
+  stdscr.nodelay(1)
 
   for row in range(0, 2 * PAGE_SIZE / BYTES_PER_ROW):
     row_addr = BASE_ADDR + BYTES_PER_ROW * row
@@ -101,6 +97,17 @@ def main(stdscr):
     middle = (lower_height - 3) / 2
     middle_addr = row_addr - (lower_height - 3 - middle) * BYTES_PER_ROW
     middle_addrs = range_length(middle_addr, BYTES_PER_ROW)
+
+    top_addr = row_addr - (lower_height - 3) * BYTES_PER_ROW
+    
+    def refresh_data():
+      for x_offset in range(0, BYTES_PER_ROW):
+        for ry in range(0, lower_height - 2):
+          rx = 12 + 3 * x_offset
+          attr = curses.color_pair(lower.inch(ry, rx) >> 8)
+          text = "%02x" % ord(mem[top_addr + x_offset + BYTES_PER_ROW * ry - BASE_ADDR])
+          lower.addstr(ry, rx, text, attr)
+      lower.refresh()
     
     def highlight_and_modify(block, text, modify):
       if not working:
@@ -113,6 +120,7 @@ def main(stdscr):
 
         lower.addstr(middle, 12 + 3 * BYTES_PER_ROW + 2, text, curses.A_BOLD)
         
+        lower.addstr(0, 12, "*")
         # Highlight block
         for block_addr in block:
           offset = block_addr - middle_addr
@@ -129,11 +137,14 @@ def main(stdscr):
             length = 2
           lower.chgat(hy, hx, length, GREEN)
           lower.refresh()
-          sleep(0.05)
+          refresh_data()
+          sleep(0.1)
 
         upper.addstr("\n")
         upper.refresh()
-        stdscr.getch()
+        while (stdscr.getch() == -1):
+          refresh_data()
+          sleep(0.1)
 
         # Modify block
         if modify:
@@ -153,14 +164,15 @@ def main(stdscr):
 
             lower.addstr(hy, hx, mod_text, RED)
             lower.refresh()
-            sleep(0.25)
+            mem[block_addr - BASE_ADDR] = chr(0)
+            refresh_data()
+            sleep(0.1)
 
           lower.addstr(middle, 12 + 3 * BYTES_PER_ROW + 2, text + " (modified)", curses.A_BOLD)
           lower.refresh()
-          if not simulate:
-            # Python can't seem to modify /dev/mem through the mmap, so use rw_mem
-            call(["./rw_mem", "-a", "0x%08x" % block[0], "-s", str(len(block)), "-w", "-h", "0x00"])
-          stdscr.getch()
+          while (stdscr.getch() == -1):
+            refresh_data()
+            sleep(0.1)
 
         lower.move(py, px)
 
