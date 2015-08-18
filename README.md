@@ -34,8 +34,8 @@ Running the demo
 the legitimate GCS has control of the Odroid.
 
 2. In the VM, go into the repository for this demo and execute
-`./attack.sh`. If that doesn't work (due to caching issues) you can
-just run `make clean hack` to do a quick version of the attack.
+`./attack.sh`. If you just want a quick hack without the graphics, run
+`make hack`.
 
 3. Demonstrate that the legitimate GCS has lost control of the Odroid.
 
@@ -44,3 +44,5 @@ cable).
 
 5. Demonstrate that the rogue GCS has control of the Odroid.
 
+6. You can reset by doing `make unhack` and restarting the legitimate
+GCS.
