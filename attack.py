@@ -5,6 +5,8 @@ import curses
 import re
 import os
 import random
+import threading
+import signal
 from time import sleep
 from mmap import mmap
 from subprocess import call
@@ -34,6 +36,27 @@ if simulate:
   working = sys.argv[1].lower() in ["true", "1", "yes", "t", "y"]
 
 mem = {}
+
+modified = threading.Event()
+def simulateMemory():
+  if not working:
+    for addr in range(0, 2 * PAGE_SIZE):
+      mem[addr] = chr(0)
+    return
+
+  for addr in range(0, 2 * PAGE_SIZE):
+    mem[addr] = chr(random.randint(0, 255))
+
+  nonce = random.randint(0, 256**3)
+  while not modified.is_set():
+    digits = []
+    i = nonce
+    for addr in NONCE1:
+      mem[addr - BASE_ADDR] = chr(i % 256)
+      i /= 256
+    nonce += 1
+    sleep(0.1)
+
 if not simulate:
   dev_mem_fd = os.open('/dev/mem', os.O_RDWR | os.O_SYNC)
   mem = mmap(dev_mem_fd, 2 * PAGE_SIZE, offset=BASE_ADDR)
@@ -41,11 +64,11 @@ if not simulate:
     if mem[addr] != chr(0):
       working = True
 else:
-  for addr in range(0, 2 * PAGE_SIZE):
-    if working:
-      mem[addr] = chr(random.randint(0, 255))
-    else:
-      mem[addr] = chr(0)
+  def exit(signal, frame):
+    modified.set()
+    sys.exit(0)
+  signal.signal(signal.SIGINT, exit)
+  threading.Thread(target=simulateMemory).start()
 
 def main(stdscr):
   my, mx = stdscr.getmaxyx()
@@ -148,6 +171,7 @@ def main(stdscr):
 
         # Modify block
         if modify:
+          modified.set()
           upper.addstr("Modifying\n", curses.A_BOLD)
           upper.refresh()
 
