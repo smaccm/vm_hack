@@ -10,10 +10,12 @@ import signal
 from time import sleep
 from mmap import mmap
 from subprocess import call
+from itertools import repeat
 
 MIN_WIDTH = 95
 UPPER_HEIGHT = 10
 BYTES_PER_ROW = 16
+ROW_LENGTH = 12 + 3 * BYTES_PER_ROW
 
 BASE_ADDR = 0x80000000
 PAGE_SIZE = 0x1000
@@ -106,7 +108,22 @@ def main(stdscr):
   upper.refresh()
   stdscr.nodelay(1)
 
-  for row in range(0, 2 * PAGE_SIZE / BYTES_PER_ROW):
+  top_addr = BASE_ADDR
+
+  def y_to_addr(y):
+    return top_addr + y * BYTES_PER_ROW
+
+  def addr_to_yx(addr):
+    y = 0
+    offset = addr - top_addr
+    while (offset >= BYTES_PER_ROW):
+      offset -= BYTES_PER_ROW
+      y += 1
+    x = 12 + 3 * offset
+    return (y, x)
+
+  # Scroll to nonce
+  for row in range(0, PAGE_SIZE / BYTES_PER_ROW):
     row_addr = BASE_ADDR + BYTES_PER_ROW * row
     lower.addstr("0x%08x: " % row_addr)
 
@@ -117,105 +134,137 @@ def main(stdscr):
     lower.refresh()
     sleep(0.015)
 
-    middle = (lower_height - 3) / 2
-    middle_addr = row_addr - (lower_height - 3 - middle) * BYTES_PER_ROW
-    middle_addrs = range_length(middle_addr, BYTES_PER_ROW)
-
     top_addr = row_addr - (lower_height - 3) * BYTES_PER_ROW
     
-    def refresh_data():
-      for x_offset in range(0, BYTES_PER_ROW):
-        for ry in range(0, lower_height - 2):
-          rx = 12 + 3 * x_offset
-          attr = curses.color_pair(lower.inch(ry, rx) >> 8)
-          text = "%02x" % ord(mem[top_addr + x_offset + BYTES_PER_ROW * ry - BASE_ADDR])
-          lower.addstr(ry, rx, text, attr)
-      lower.refresh()
-    
-    def highlight_and_modify(block, text, modify):
-      if not working:
-        return
+    focus = (lower_height - 3) * 2 / 3
+    focus_addrs = range_length(y_to_addr(focus), BYTES_PER_ROW)
 
-      if block[0] in middle_addrs:
-        py, px = lower.getyx()
-        upper.addstr("Found " + text + ": ")
-        upper.refresh()
-
-        lower.addstr(middle, 12 + 3 * BYTES_PER_ROW + 2, text, curses.A_BOLD)
-        
-        lower.addstr(0, 12, "*")
-        # Highlight block
-        for block_addr in block:
-          offset = block_addr - middle_addr
-          hy = middle
-          while (offset >= BYTES_PER_ROW):
-            offset -= BYTES_PER_ROW
-            hy += 1
-          hx = 12 + 3 * offset
-
-          upper.addstr("%02x " % ord(mem[block_addr - BASE_ADDR]))
-          upper.refresh()
-          length = 3
-          if (offset == BYTES_PER_ROW - 1 or block_addr == block[-1]):
-            length = 2
-          lower.chgat(hy, hx, length, GREEN)
-          lower.refresh()
-          refresh_data()
-          sleep(0.1)
-
-        upper.addstr("\n")
-        upper.refresh()
-        while (stdscr.getch() == -1):
-          refresh_data()
-          sleep(0.1)
-
-        # Modify block
-        if modify:
-          modified.set()
-          upper.addstr("Modifying\n", curses.A_BOLD)
-          upper.refresh()
-
-          for block_addr in block:
-            offset = block_addr - middle_addr
-            hy = middle
-            while (offset >= BYTES_PER_ROW):
-              offset -= BYTES_PER_ROW
-              hy += 1
-            hx = 12 + 3 * offset
-            mod_text = "00 "
-            if (offset == BYTES_PER_ROW - 1 or block_addr == block[-1]):
-              mod_text = "00"
-
-            lower.addstr(hy, hx, mod_text, RED)
-            lower.refresh()
-            mem[block_addr - BASE_ADDR] = chr(0)
-            refresh_data()
-            sleep(0.1)
-
-          lower.addstr(middle, 12 + 3 * BYTES_PER_ROW + 2, text + " (modified)", curses.A_BOLD)
-          lower.refresh()
-          while (stdscr.getch() == -1):
-            refresh_data()
-            sleep(0.1)
-
-        lower.move(py, px)
-
-    highlight_and_modify(KEY1, "decryption key", False)
-    highlight_and_modify(KEY2, "encryption key", False)
-    highlight_and_modify(SALT1, "decryption salt", True)
-    highlight_and_modify(SALT2, "encryption salt", True)
-    highlight_and_modify(NONCE1, "decryption nonce", True)
-    highlight_and_modify(NONCE2, "encryption nonce", True)
-
+    if working and NONCE1[0] in focus_addrs:
+      break
     lower.addstr("\n")
 
-  if not working:
-    upper.addstr("Attacked fail!\n", curses.A_BOLD)
+  def label(y, text):
+    lower.addstr(y, ROW_LENGTH + 2, text, curses.A_BOLD)
+    lower.refresh()
+
+  def label_addr(addr, text):
+    y, _ = addr_to_yx(addr)
+    label(y, text)
+
+  def refresh_data():
+    for x_offset in range(0, BYTES_PER_ROW):
+      for ry in range(0, lower_height - 2):
+        rx = 12 + 3 * x_offset
+        attr = curses.color_pair(lower.inch(ry, rx) >> 8)
+        text = "%02x" % ord(mem[top_addr + x_offset + BYTES_PER_ROW * ry - BASE_ADDR])
+        lower.addstr(ry, rx, text, attr)
+    lower.refresh()
+
+  def wait_for_key():
+    while (stdscr.getch() == -1):
+      refresh_data()
+      sleep(0.1)
+
+  def is_highlighted(y, x, color):
+    return curses.color_pair(lower.inch(y, x) >> 8) == color
+
+  def highlight_byte(addr, color):
+    y, x = addr_to_yx(addr)
+    lower.chgat(y, x, 2, color)
+    if is_highlighted(y, x - 2, color):
+      lower.chgat(y, x - 1, 1, color)
+    lower.refresh()
+    
+  def highlight(block, color, text):
+    y0, x0 = addr_to_yx(block[0])
+    label(y0, text)
+    
+    for block_addr in block:
+      highlight_byte(block_addr, color)
+      refresh_data()
+      sleep(0.1)
+
+  def get_attrs(win, y, x_range):
+    return [curses.color_pair(win.inch(y, x) >> 8) for x in x_range]
+
+  def set_attrs(win, y, x_range, attrs):
+    for (x, attr) in zip(x_range, attrs):
+      win.chgat(y, x, 1, attr)
+
+  def scan():
+    for sy in range(0, lower_height - 2):
+      attrs = get_attrs(lower, sy, range(ROW_LENGTH - 1))
+      set_attrs(lower, sy, range(ROW_LENGTH - 1), repeat(GREEN))
+      refresh_data()
+      sleep(0.05)
+      set_attrs(lower, sy, range(ROW_LENGTH - 1), attrs)
+      for offset in range(0, BYTES_PER_ROW):
+        addr = y_to_addr(sy) + offset
+        if addr in KEY1 + SALT1:
+          highlight_byte(addr, GREEN)
+        if addr == KEY1[0]:
+          label(sy, "crypto key")
+        elif addr == SALT1[0]:
+          label(sy, "crypto salt")
+
+  def overwrite():
+    # Overwrite decryption salt and nonce
+    for addr in SALT1 + NONCE1:
+      mem[addr - BASE_ADDR] = chr(0)
+      modified.set()
+      highlight_byte(addr, RED)
+      if addr == SALT1[-1]:
+        label_addr(SALT1[0], "crypto salt (modified)")
+      if addr == NONCE1[-1]:
+        label_addr(NONCE1[0], "crypto nonce (modified)")
+      refresh_data()
+      sleep(0.1)
+
+    # Overwrite encryption salt and nonce too, but don't display it
+    for addr in SALT2 + NONCE2:
+      mem[addr - BASE_ADDR] = chr(0)
+
+  if working:
+    # Highlight nonce
+    upper.addstr("Found nonce\n")
     upper.refresh()
+    highlight(NONCE1, GREEN, "crypto nonce")
+    wait_for_key()
+    
+    # Scan for salt and key
+    upper.addstr("Searching nearby for salt and key\n")
+    upper.refresh()
+    scan()
+    upper.addstr("Found and salt and key\n")
+    upper.refresh()
+    wait_for_key()
+    
+    # Overwrite salt and key
+    upper.addstr("Overwriting salt and nonce\n")
+    upper.refresh()
+    overwrite()
 
-  upper.addstr("Finished (press q to quit)")
+  # Final status message
+  if working:
+    upper.addstr("Attack successful!", curses.A_BOLD)
+  if not working:
+    upper.addstr("Attacked failed!", curses.A_BOLD)
+  y, x = upper.getyx()
+  upper.addstr("\n")
+  upper.addstr("Press q to quit")
   upper.refresh()
-  while (stdscr.getch() != ord('q')):
-    pass
 
-curses.wrapper(main)
+  # Blink message highlighting
+  prev_attrs = get_attrs(upper, y, range(x))
+  attrs = repeat(GREEN | curses.A_BOLD) if working else repeat(RED | curses.A_BOLD)
+  while (stdscr.getch() != ord('q')):
+    set_attrs(upper, y, range(x), attrs)
+    upper.refresh()
+    prev_attrs, attrs = attrs, prev_attrs
+    sleep(0.5)
+  modified.set()
+
+try:
+  curses.wrapper(main)
+finally:
+  modified.set()
