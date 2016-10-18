@@ -72,6 +72,9 @@ else:
   signal.signal(signal.SIGINT, exit)
   threading.Thread(target=simulateMemory).start()
 
+with open("banner.txt", "r") as f:
+  banner = [line.rstrip() for line in f.readlines()]
+
 def main(stdscr):
   my, mx = stdscr.getmaxyx()
   lower_height = max(7, my - UPPER_HEIGHT)
@@ -184,20 +187,21 @@ def main(stdscr):
       refresh_data()
       sleep(0.1)
 
-  def get_attrs(win, y, x_range):
-    return [curses.color_pair(win.inch(y, x) >> 8) for x in x_range]
+  def get_attrs(win, y_range, x_range):
+    return [[curses.color_pair(win.inch(y, x) >> 8) for x in x_range] for y in y_range]
 
-  def set_attrs(win, y, x_range, attrs):
-    for (x, attr) in zip(x_range, attrs):
-      win.chgat(y, x, 1, attr)
+  def set_attrs(win, y_range, x_range, yx_attrs):
+    for y, x_attrs in zip(y_range, yx_attrs):
+      for x, attr in zip(x_range, x_attrs):
+        win.chgat(y, x, 1, attr)
 
   def scan():
     for sy in range(0, lower_height - 2):
-      attrs = get_attrs(lower, sy, range(ROW_LENGTH - 1))
-      set_attrs(lower, sy, range(ROW_LENGTH - 1), repeat(GREEN))
+      attrs = get_attrs(lower, [sy], range(ROW_LENGTH - 1))
+      set_attrs(lower, [sy], range(ROW_LENGTH - 1), repeat(repeat(GREEN)))
       refresh_data()
       sleep(0.05)
-      set_attrs(lower, sy, range(ROW_LENGTH - 1), attrs)
+      set_attrs(lower, [sy], range(ROW_LENGTH - 1), attrs)
       for offset in range(0, BYTES_PER_ROW):
         addr = y_to_addr(sy) + offset
         if addr in KEY1 + SALT1:
@@ -247,22 +251,47 @@ def main(stdscr):
   # Final status message
   if working:
     upper.addstr("Attack successful!", curses.A_BOLD)
-  if not working:
-    upper.addstr("Attacked failed!", curses.A_BOLD)
-  y, x = upper.getyx()
-  upper.addstr("\n")
-  upper.addstr("Press q to quit")
-  upper.refresh()
 
-  # Blink message highlighting
-  prev_attrs = get_attrs(upper, y, range(x))
-  attrs = repeat(GREEN | curses.A_BOLD) if working else repeat(RED | curses.A_BOLD)
-  while (stdscr.getch() != ord('q')):
-    set_attrs(upper, y, range(x), attrs)
+    y, x = upper.getyx()
+    upper.addstr("\n")
+    upper.addstr("Press q to quit")
     upper.refresh()
-    prev_attrs, attrs = attrs, prev_attrs
-    sleep(0.5)
-  modified.set()
+
+    # Blink message highlighting
+    prev_attrs = get_attrs(upper, [y], range(x))
+    attrs = repeat(repeat(GREEN | curses.A_BOLD))
+    while (stdscr.getch() != ord('q')):
+      set_attrs(upper, [y], range(x), attrs)
+      upper.refresh()
+      prev_attrs, attrs = attrs, prev_attrs
+      sleep(0.5)
+
+  if not working:
+    upper.addstr("Attacked failed!\n", curses.A_BOLD)
+    upper.addstr("Press q to quit")
+    upper.refresh()
+
+    banner_length = max([len(line) for line in banner])
+    banner_height = len(banner)
+    popup_height = banner_height + 6
+    popup_width = banner_length + 20
+    text_x = (popup_width - banner_length) / 2
+    text_y = (popup_height - banner_height) / 2
+    popup_x = (mx - popup_width) / 2
+    popup_y = (my - popup_height) / 2
+    popup_box = curses.newwin(popup_height, popup_width, popup_y, popup_x)
+    popup_box.border(0)
+    for i, line in enumerate(banner):
+      popup_box.addstr(i + text_y, text_x, line)
+      popup_box.refresh()
+
+    # Blink message
+    background = 0
+    while (stdscr.getch() != ord('q')):
+      popup_box.bkgd(background)
+      popup_box.refresh()
+      background ^= RED
+      sleep(0.5)
 
 try:
   curses.wrapper(main)
