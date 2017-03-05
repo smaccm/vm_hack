@@ -39,10 +39,7 @@ def draw_programs(window, programs):
 
   shuffle(programs)
   for p in programs:
-    try:
-      draw_program(window, p.y, p.x)
-    except:
-      pass
+    draw_program(window, p.y, p.x)
   window.refresh()
 
 def advance_program(p):
