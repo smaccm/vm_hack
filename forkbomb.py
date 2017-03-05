@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 
 import curses
-from random import choice
+from random import choice, shuffle
 from time import sleep
 from collections import namedtuple
 
-Point = namedtuple('Point',
+Program = namedtuple('Program',
                    ['x', 'y', 'x_min', 'x_max', 'y_min', 'y_max', 'next_split'])
 
 def sign(x):
@@ -16,24 +16,35 @@ def sign(x):
   else:
     return 1
 
-def draw_points(window, points):
+def addchr(window, y, x, c, attr):
+  try:
+    window.addstr(y, x, c, attr)
+  except:
+    pass
+
+def draw_program(window, y, x):
+  addchr(window, y, x, '#', curses.color_pair(1) | curses.A_BOLD)
+  addchr(window, y - 1, x, '#', curses.color_pair(1) | curses.A_NORMAL)
+  addchr(window, y + 1, x, '#', curses.color_pair(1) | curses.A_NORMAL)
+  addchr(window, y, x - 1, '#', curses.color_pair(1) | curses.A_NORMAL)
+  addchr(window, y, x + 1, '#', curses.color_pair(1) | curses.A_NORMAL)
+  addchr(window, y - 1, x - 1, '#', curses.color_pair(1) | curses.A_DIM)
+  addchr(window, y + 1, x + 1, '#', curses.color_pair(1) | curses.A_DIM)
+  addchr(window, y + 1, x - 1, '#', curses.color_pair(1) | curses.A_DIM)
+  addchr(window, y - 1, x + 1, '#', curses.color_pair(1) | curses.A_DIM)
+
+def draw_programs(window, programs):
   window.erase()
-  my, mx = window.getmaxyx()
 
-  contrasts = [curses.A_BOLD]
-  if len(points) > 40:
-    contrasts = [curses.A_DIM, curses.A_NORMAL, curses.A_BOLD]
-
-  for p in points:
-    if 0 <= p.x < mx and 0 <= p.y < my:
-      try:
-        window.addstr(p.y, p.x, '#',
-                      curses.color_pair(1) | choice(contrasts))
-      except:
-        pass
+  shuffle(programs)
+  for p in programs:
+    try:
+      draw_program(window, p.y, p.x)
+    except:
+      pass
   window.refresh()
 
-def advance_point(p):
+def advance_program(p):
   # Try to move towards center
   x_center = (p.x_min + p.x_max) / 2
   y_center = (p.y_min + p.y_max) / 2
@@ -54,23 +65,36 @@ def advance_point(p):
   else:
     return []
 
-
-def move_points(points):
+def move_programs(programs):
   result = []
-  for p in points:
-    result.extend(advance_point(p))
+  for p in programs:
+    result.extend(advance_program(p))
   return result
+
+def splitting_animation(window):
+  my, mx = window.getmaxyx()
+  programs = [Program(mx/2, 0, 0, mx, 0, my, 'x')]
+  while len(programs) < my * mx:
+    draw_programs(window, programs)
+    programs = move_programs(programs)
+    sleep(0.04)
+
+def sparkle_animation(window):
+  my, mx = window.getmaxyx()
+  contrasts = [curses.A_DIM] * 4 + [curses.A_NORMAL] * 4 + [curses.A_BOLD]
+  while True:
+    for y in range(my):
+      for x in range(mx):
+        addchr(window, y, x, '#', curses.color_pair(1) | choice(contrasts))
+    sleep(0.1)
+    window.refresh()
 
 def main(stdscr):
   curses.curs_set(False)
-  my, mx = stdscr.getmaxyx()
   curses.init_pair(1, curses.COLOR_GREEN, curses.COLOR_BLACK)
 
-  points = [Point(mx/2, 0, 0, mx, 0, my, 'x')]
-  for _ in range(140):
-    draw_points(stdscr, points)
-    points = move_points(points)
-    sleep(0.04)
+  splitting_animation(stdscr)
+  sparkle_animation(stdscr)
   sleep(1000)
 
 curses.wrapper(main)
