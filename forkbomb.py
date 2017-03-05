@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 
 import curses
-from random import choice, shuffle
+from random import choice, shuffle, randint
 from time import sleep
 from collections import namedtuple
+from math import log
 
 Program = namedtuple('Program',
                    ['x', 'y', 'x_min', 'x_max', 'y_min', 'y_max', 'next_split'])
@@ -55,11 +56,11 @@ def advance_program(p):
 
   # Destination reached, perform split
   if p.next_split == 'x':
-    q1 = p._replace(x_max=x_center, next_split='y')
-    q2 = p._replace(x_min=x_center, next_split='y')
+    q1 = p._replace(x_max=x_center, next_split='y', x=p.x-1)
+    q2 = p._replace(x_min=x_center, next_split='y', x=p.x+1)
   else:
-    q1 = p._replace(y_max=y_center, next_split='x')
-    q2 = p._replace(y_min=y_center, next_split='x')
+    q1 = p._replace(y_max=y_center, next_split='x', y=p.y-1)
+    q2 = p._replace(y_min=y_center, next_split='x', y=p.y+1)
   if q1 != q2:
     return [q1, q2]
   else:
@@ -67,34 +68,48 @@ def advance_program(p):
 
 def move_programs(programs):
   result = []
+  d = 5
   for p in programs:
+    if randint(0, 3) == 0:
+      p = p._replace(x_min=p.x_min+randint(-d, d),
+                     x_max=p.x_max+randint(-d, d),
+                     y_min=p.y_min+randint(-d, d),
+                     y_max=p.y_max+randint(-d, d))
     result.extend(advance_program(p))
   return result
+
+def remove_overlapping_programs(programs):
+  result = []
+  taken = set()
+  for p in programs:
+    if (p.x, p.y) not in taken:
+      taken.add((p.x, p.y))
+      result.append(p)
+  return result
+
+def space_available(window, programs):
+  my, mx = window.getmaxyx()
+  space = my * mx
+  taken = 0
+  for p in programs:
+    if p.x in range(mx) and p.y in range(my):
+      taken += 1
+  return taken < space * 0.35
 
 def splitting_animation(window):
   my, mx = window.getmaxyx()
   programs = [Program(mx/2, 0, 0, mx, 0, my, 'x')]
-  while len(programs) < my * mx:
+  while space_available(window, programs):
     draw_programs(window, programs)
+    programs = remove_overlapping_programs(programs)
     programs = move_programs(programs)
-    sleep(0.04)
-
-def sparkle_animation(window):
-  my, mx = window.getmaxyx()
-  contrasts = [curses.A_DIM] * 4 + [curses.A_NORMAL] * 4 + [curses.A_BOLD]
-  while True:
-    for y in range(my):
-      for x in range(mx):
-        addchr(window, y, x, '#', curses.color_pair(1) | choice(contrasts))
-    sleep(0.1)
-    window.refresh()
+    sleep(0.06)
 
 def main(stdscr):
   curses.curs_set(False)
-  curses.init_pair(1, curses.COLOR_GREEN, curses.COLOR_BLACK)
+  curses.init_pair(1, curses.COLOR_RED, curses.COLOR_BLACK)
 
   splitting_animation(stdscr)
-  sparkle_animation(stdscr)
   sleep(1000)
 
 curses.wrapper(main)
